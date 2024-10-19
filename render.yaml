@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: multiservice
+    env: node
+    buildCommand: "npm install"
+    startCommand: "node node/index.js"

@@ -1,0 +1,19 @@
+{
+  "name": "free-iptv-channels",
+  "version": "1.0.0",
+  "description": "Generates an m3u8 playlist from Pluto, Samsung, Stirr, Plex, PBS, and Roku channels.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "IPTV",
+    "Plex",
+    "Node.js",
+    "channels"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {}
+}

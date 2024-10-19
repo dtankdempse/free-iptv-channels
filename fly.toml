@@ -1,0 +1,10 @@
+app = "multiservice"
+
+[build]
+  builder = "paketobuildpacks/builder:base"
+
+[env]
+  NODE_ENV = "production"
+
+[deploy]
+  release_command = "node node/index.js"

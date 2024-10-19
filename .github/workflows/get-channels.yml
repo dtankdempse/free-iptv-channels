@@ -1,0 +1,49 @@
+name: Fetch Plex Channels
+
+on:
+  schedule:
+    - cron: '0 0 */3 * *' 
+  workflow_dispatch:
+
+jobs:
+  scrape-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+    # Checkout code with full history for reset
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0 
+
+    # Set up PHP environment
+    - name: Set up PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.0'
+
+    # Run the PHP script
+    - name: Run PHP script
+      run: |
+        php plex/fetchPlexChannels.php || exit 1 
+
+    # Squash changes and force push (to avoid history buildup)
+    - name: Squash and force push changes
+      if: success()
+      run: |
+        # Set up git config (locally for this repository)
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git config user.name "github-actions[bot]"
+
+        # Reset to the first commit
+        FIRST_COMMIT=$(git rev-list --max-parents=0 HEAD)
+        git reset --soft $FIRST_COMMIT
+
+        # Add all changes to a new commit
+        git add plex/channels.json
+        git commit -m "Update Plex Channels" || echo "No changes to commit"
+
+        # Force push the new history
+        git push -f origin main
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
