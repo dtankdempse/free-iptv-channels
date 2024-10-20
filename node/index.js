@@ -248,7 +248,7 @@ const server = http.createServer(async (req, res) => {
             chno = ` tvg-chno="${channel.chno}"`;
           }
 
-          output += `#EXTINF:-1 channel-id="${channelId}" tvg-id="${key}" tvg-logo="${logo}" group-title="${regionFullName}"${chno},${name}\n${url}\n`;
+          output += `#EXTINF:-1 channel-id="${channelId}" tvg-name="${name}" tvg-id="${key}" tvg-logo="${logo}" group-title="${regionFullName}"${chno},${name}\n${url}\n`;
         }
       });
     } else {
@@ -270,7 +270,7 @@ const server = http.createServer(async (req, res) => {
           chno = ` tvg-chno="${channel.chno}"`;
         }
 
-        output += `#EXTINF:-1 channel-id="${channelId}" tvg-id="${key}" tvg-logo="${logo}" group-title="${group}"${chno},${name}\n${url}\n`;
+        output += `#EXTINF:-1 channel-id="${channelId}" tvg-name="${name}" tvg-id="${key}" tvg-logo="${logo}" group-title="${group}"${chno},${name}\n${url}\n`;
       }
     }
   });
@@ -303,8 +303,7 @@ const server = http.createServer(async (req, res) => {
 function handleHomePage(res) {
   // Serve the HTML content for the home page
   res.writeHead(200, { 'Content-Type': 'text/html' });
-  res.end(`
-    <!DOCTYPE html>
+  res.end(`<!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
@@ -366,7 +365,7 @@ function handleHomePage(res) {
           <li>PBS</li>
           <li>PBSKids</li>
           <li>Stirr</li>
-          <li>Tubi</li>
+		  <li>Tubi</li>
         </ul>
 
         <h2>Available Region Parameter Values</h2>
@@ -392,8 +391,20 @@ function handleHomePage(res) {
           <li><code>name</code> (default): Sorts the channels alphabetically by their name.</li>
           <li><code>chno</code>: Sorts the channels by their assigned channel number.</li>
         </ul>
-      </div>
+      
+	  
+		<h2>EPG for TV Guide Information</h2>
 
+		<p>The EPG URLs are embedded directly within the playlists. If you'd prefer to manually add the EPG guide, you can find the relevant URLs for each service on this <a href="https://github.com/matthuisman/i.mjh.nz/">page</a>.</p>
+
+		<h2>Disclaimer:</h2>
+
+		<p>This repository has no control over the streams, links, or the legality of the content provided by Pluto, Samsung, Stirr, Tubi, Plex, PBS, and Roku. Additionally, this script simply converts the JSON files provided by <a href="https://i.mjh.nz">i.mjh.nz</a> into an M3U8 playlist. It is the end user's responsibility to ensure the legal use of these streams. We strongly recommend verifying that the content complies with the laws and regulations of your country before use.</p>
+		
+		<footer style="text-align: center; margin: 30px 0;">
+			<p>Created by <a href="https://github.com/dtankdempse/free-iptv-channels" target="_blank">Tank Dempse</a></p>
+		</footer>
+	</div>
       <script>
         const origin = window.location.origin;
         const accessUrl = \`\${origin}?region=ADD_REGION&service=ADD_SERVICE\`;
@@ -401,8 +412,7 @@ function handleHomePage(res) {
         document.getElementById('access-url').textContent = accessUrl;
       </script>
     </body>
-    </html>
-  `);
+    </html>`);
 }
 
 
@@ -513,7 +523,7 @@ async function handlePBSKids() {
 
     sortedKeys.forEach(key => {
       const channel = data.channels[key];
-      output += `#EXTINF:-1 channel-id="pbskids-${key}" tvg-id="${key}" tvg-logo="${channel.logo}", ${channel.name}\n${channel.url}\n`;
+      output += `#EXTINF:-1 channel-id="pbskids-${key}" tvg-name="${channel.name}" tvg-id="${key}" tvg-logo="${channel.logo}", ${channel.name}\n${channel.url}\n`;
     });
 
     return output;
@@ -528,7 +538,7 @@ function formatPbsDataForM3U8(data) {
 
   Object.keys(data.channels).forEach(key => {
     const channel = data.channels[key];
-    output += `#EXTINF:-1 channel-id="pbs-${key}" tvg-id="${key}" tvg-logo="${channel.logo}", ${channel.name}\n`;
+    output += `#EXTINF:-1 channel-id="pbs-${key}" tvg-name="${channel.name}" tvg-id="${key}" tvg-logo="${channel.logo}", ${channel.name}\n`;
     output += `#KODIPROP:inputstream.adaptive.manifest_type=mpd\n`;
     output += `#KODIPROP:inputstream.adaptive.license_type=com.widevine.alpha\n`;
     output += `#KODIPROP:inputstream.adaptive.license_key=${channel.license}|Content-Type=application%2Foctet-stream&user-agent=okhttp%2F4.9.0|R{SSM}|\n`;
