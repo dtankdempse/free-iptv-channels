@@ -366,6 +366,7 @@ function handleHomePage(res) {
           <li>PBS</li>
           <li>PBSKids</li>
           <li>Stirr</li>
+          <li>Tubi</li>
         </ul>
 
         <h2>Available Region Parameter Values</h2>
