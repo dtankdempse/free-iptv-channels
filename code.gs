@@ -7,6 +7,30 @@ function doGet(e) {
   if (!service) {
     return ContentService.createTextOutput('Error: No service type provided').setMimeType(ContentService.MimeType.TEXT);
   }
+
+  // Handle Tubi service without caching
+if (service.toLowerCase() === 'tubi') {
+  let data;
+
+  try {
+    Logger.log('Fetching new Tubi data');
+    const playlistUrl = 'https://github.com/dtankdempse/tubi-m3u/raw/refs/heads/main/tubi_playlist_us.m3u';
+    const response = UrlFetchApp.fetch(playlistUrl);
+    data = response.getContentText();
+
+    let epgUrl = 'https://raw.githubusercontent.com/dtankdempse/tubi-m3u/refs/heads/main/tubi_epg_us.xml';
+    let output = `#EXTM3U url-tvg="${epgUrl}"
+`;
+    output += data;
+
+    return ContentService.createTextOutput(output)
+      .setMimeType(ContentService.MimeType.TEXT);
+  } catch (error) {
+    Logger.log('Error fetching Tubi data: ' + error.message);
+    return handleError('Error fetching Tubi data: ' + error.message);
+  }
+}
+
   
   if (service.toLowerCase() === 'pbskids') {
 	const pbsKidsOutput = handlePBSKids();  // Call the PBS Kids handler function
@@ -270,7 +294,7 @@ function encodeParams(params) {
 
   if (service.toLowerCase() === 'plex') {
 	  // Fetch the Plex token
-	  const plexToken = getPlexToken(); 
+	  const plexToken = getPlexToken(); // You can pass the region if needed
 	  
 	  if (plexToken) {
 		// Perform the string replacements for Plex only if a valid token is returned
