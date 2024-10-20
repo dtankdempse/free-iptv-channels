@@ -262,7 +262,7 @@ function encodeParams(params) {
             chno = ` tvg-chno="${channel.chno}"`;
           }
 
-          output += `#EXTINF:-1 channel-id="${channelId}" tvg-id="${key}" tvg-logo="${logo}" group-title="${regionFullName}"${chno},${name}\n${url}\n`;
+          output += `#EXTINF:-1 channel-id="${channelId}" tvg-name="${name}" tvg-id="${key}" tvg-logo="${logo}" group-title="${regionFullName}"${chno},${name}\n${url}\n`;
         }
       });
     } else {
@@ -285,7 +285,7 @@ function encodeParams(params) {
           chno = ` tvg-chno="${channel.chno}"`;
         }
 
-        output += `#EXTINF:-1 channel-id="${channelId}" tvg-id="${key}" tvg-logo="${logo}" group-title="${group}"${chno},${name}\n${url}\n`;
+        output += `#EXTINF:-1 channel-id="${channelId}" tvg-name="${name}" tvg-id="${key}" tvg-logo="${logo}" group-title="${group}"${chno},${name}\n${url}\n`;
       }
     }
   });
@@ -316,7 +316,8 @@ function formatPbsDataForM3U8(data) {
 
   Object.keys(data.channels).forEach(key => {
     const channel = data.channels[key];
-    output += '#EXTINF:-1 channel-id="pbs-' + key + '" tvg-id="' + key + '" tvg-logo="' + channel.logo + '", ' + channel.name + '\n';
+    output += '#EXTINF:-1 channel-id="pbs-' + key + '" tvg-id="' + key + '" tvg-name="' + channel.name + '" tvg-logo="' + channel.logo + '", ' + channel.name + '\n';
+
     output += '#KODIPROP:inputstream.adaptive.manifest_type=mpd\n';
     output += '#KODIPROP:inputstream.adaptive.license_type=com.widevine.alpha\n';
     output += '#KODIPROP:inputstream.adaptive.license_key=' + channel.license + '|Content-Type=application%2Foctet-stream&user-agent=okhttp%2F4.9.0|R{SSM}|\n';
@@ -348,7 +349,7 @@ function handlePBSKids() {
       const channel = data.channels[key];
       const { logo, name, url } = channel; // Extract necessary data from the channel
       
-      output += `#EXTINF:-1 channel-id="pbskids-${key}" tvg-id="${key}" tvg-logo="${logo}", ${name}\n${url}\n`;
+      output += `#EXTINF:-1 channel-id="pbskids-${key}" tvg-name="${name}" tvg-id="${key}" tvg-logo="${logo}", ${name}\n${url}\n`;
     });
 
     return output;
