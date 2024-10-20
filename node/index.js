@@ -1,50 +1,57 @@
-function doGet(e) {
-  const params = e.parameter;
+const http = require('http');
+const https = require('https');
+const url = require('url');
+
+const hostname = '0.0.0.0';
+const port = 4242;
+
+const server = http.createServer(async (req, res) => {
+  const parsedUrl = url.parse(req.url, true);
+  const params = parsedUrl.query;
+  const pathname = parsedUrl.pathname;
   const region = (params.region || 'us').toLowerCase().trim();
   const service = params.service;
+  
+    // Check for the root path "/"
+  if (pathname === '/' && !parsedUrl.query.service) {
+    return handleHomePage(res);
+  }
 
   // Check if the service parameter is missing
   if (!service) {
-    return ContentService.createTextOutput('Error: No service type provided').setMimeType(ContentService.MimeType.TEXT);
+    res.writeHead(400, { 'Content-Type': 'text/plain' });
+    return res.end('Error: No service type provided');
   }
-
-  // Handle Tubi service without caching
-if (service.toLowerCase() === 'tubi') {
-  let data;
-
-  try {
-    Logger.log('Fetching new Tubi data');
-    const playlistUrl = 'https://github.com/dtankdempse/tubi-m3u/raw/refs/heads/main/tubi_playlist_us.m3u';
-    const response = UrlFetchApp.fetch(playlistUrl);
-    data = response.getContentText();
-    
-    let output = '';
-    output += data;
-
-    return ContentService.createTextOutput(output)
-      .setMimeType(ContentService.MimeType.TEXT);
-  } catch (error) {
-    Logger.log('Error fetching Tubi data: ' + error.message);
-    return handleError('Error fetching Tubi data: ' + error.message);
-  }
-}
-
   
-  if (service.toLowerCase() === 'pbskids') {
-	const pbsKidsOutput = handlePBSKids();  // Call the PBS Kids handler function
-	return ContentService.createTextOutput(pbsKidsOutput).setMimeType(ContentService.MimeType.TEXT);
+  if (service.toLowerCase() === 'tubi') {
+    const tubiOutput = await handleTubi();
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    return res.end(tubiOutput);
   }
 
-  const APP_URL = 'https://i.mjh.nz/' + service + '/.app.json';
-  const response = UrlFetchApp.fetch(APP_URL);
-  const data = JSON.parse(response.getContentText());
+  if (service.toLowerCase() === 'pbskids') {
+    const pbsKidsOutput = await handlePBSKids();
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    return res.end(pbsKidsOutput);
+  }
+
+  const APP_URL = `https://i.mjh.nz/${service}/.app.json`;
+  let data;
+  try {
+    data = await fetchJson(APP_URL);
+  } catch (error) {
+    res.writeHead(500, { 'Content-Type': 'text/plain' });
+    return res.end('Error: Failed to fetch data');
+  }
 
   if (service.toLowerCase() === 'pbs') {
-    return ContentService.createTextOutput(formatPbsDataForM3U8(data))
-      .setMimeType(ContentService.MimeType.TEXT);
+    const pbsOutput = formatPbsDataForM3U8(data);
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    return res.end(pbsOutput);
   }
 
   let channels = {};
+  const sort = params.sort || 'name';
   let groupExtractionRequired = false;
   let regionNames = {}; // For Plex, to map region codes to full names
 
@@ -61,168 +68,152 @@ if (service.toLowerCase() === 'tubi') {
   if (data.channels) {
     // Channels are directly in the data object, and group extraction is needed
     channels = data.channels;
+ 
+	// Plex-specific genre mapping when region is NOT 'all'
+	if (service.toLowerCase() === 'plex' && region !== 'all') {
+	  const channelsJsonUrl = 'https://raw.githubusercontent.com/dtankdempse/free-iptv-channels/main/plex/channels.json';
+	  let plexChannels;
+	  try {
+		plexChannels = await fetchJson(channelsJsonUrl);
+	  } catch (error) {
+		res.writeHead(500, { 'Content-Type': 'text/plain' });
+		return res.end('Error: Failed to fetch Plex channels');
+	  }
 
-    // Plex-specific region filtering logic
-    if (service.toLowerCase() === 'plex' && region !== 'all') {
-      const channelsJsonUrl = 'https://raw.githubusercontent.com/dtankdempse/free-iptv-channels/main/plex/channels.json';
-      
-      // Fetch the Plex channels JSON
-      const plexChannelsResponse = UrlFetchApp.fetch(channelsJsonUrl);
-      const plexChannels = JSON.parse(plexChannelsResponse.getContentText());
+	  channels = Object.keys(channels).reduce((filteredChannels, key) => {
+		const channel = channels[key];
+		if (channel.regions && channel.regions.includes(region)) {
+		  // Search for the channel in the Plex channels JSON by title
+		  const plexChannel = plexChannels.find(ch => ch.Title === channel.name);
 
-      channels = Object.keys(channels).reduce((filteredChannels, key) => {
-        const channel = channels[key];
-        
-        if (channel.regions && channel.regions.includes(region)) {
-          // Search for the channel in the Plex channels JSON by title
-          const plexChannel = plexChannels.find(ch => ch.Title === channel.name);
-          
-          // Use the genre from the Plex channels JSON for group-title, default to "Uncategorized"
-          const genre = plexChannel && plexChannel.Genre ? plexChannel.Genre : 'Uncategorized';
+		  // Use the genre from the Plex channels JSON for group-title, default to "Uncategorized"
+		  const genre = plexChannel && plexChannel.Genre ? plexChannel.Genre : 'Uncategorized';
+		  
+		  // Assign the genre to the group-title
+		  filteredChannels[key] = { 
+			...channel, 
+			group: `${genre}`
+		  };
+		}
+		return filteredChannels;
+	  }, {});
+	}
 
-          // Assign only the genre when region is NOT 'all'
-          filteredChannels[key] = { 
-            ...channel, 
-            group: `${genre}` // Ensure it only assigns genre here, not region
-          };
-        }
+	function getPlexToken(countryCode = null) {
+	  return new Promise((resolve, reject) => {
+		const headers = {
+		  'Accept': 'application/json, text/javascript, */*; q=0.01',
+		  'Accept-Language': 'en',
+		  'Origin': 'https://app.plex.tv',
+		  'Referer': 'https://app.plex.tv/',
+		  'Sec-Ch-Ua-Mobile': '?0',
+		  'Sec-Ch-Ua-Platform': '"Linux"',
+		  'Sec-Fetch-Dest': 'empty',
+		  'Sec-Fetch-Mode': 'cors',
+		  'Sec-Fetch-Site': 'same-site',
+		  'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+		};
 
-        return filteredChannels;
-      }, {});
-    }
+		const params = {
+		  'X-Plex-Product': 'Plex Web',
+		  'X-Plex-Version': '4.126.1',
+		  'X-Plex-Client-Identifier': uuidv4(),  // Generate a unique identifier
+		  'X-Plex-Language': 'en',
+		  'X-Plex-Platform': 'Chrome',
+		  'X-Plex-Platform-Version': '123.0',
+		  'X-Plex-Features': 'external-media,indirect-media,hub-style-list',
+		  'X-Plex-Model': 'hosted',
+		  'X-Plex-Device': 'Linux',
+		  'X-Plex-Device-Name': 'Chrome',
+		  'X-Plex-Device-Screen-Resolution': '1282x929,1920x1080',
+		};
 
-    // Separate logic when region is "all" for region-based mapping
-    if (service.toLowerCase() === 'plex' && region === 'all') {
-      channels = Object.keys(channels).reduce((filteredChannels, key) => {
-        const channel = channels[key];
+		const plexUrl = `https://clients.plex.tv/api/v2/users/anonymous?${encodeParams(params)}`;
 
-        // Add the regionNameMap mapping for each region
-        if (channel.regions && channel.regions.length > 0) {
-          channel.regions.forEach(regionCode => {
-            const regionFullName = regionNameMap[regionCode] || regionCode.toUpperCase();
+		const options = {
+		  method: 'POST',
+		  headers: headers,
+		};
 
-            filteredChannels[key] = {
-              ...channel,
-              group: `${regionFullName}` // Only apply region name when region is "all"
-            };
-          });
-        }
+		const req = https.request(plexUrl, options, (res) => {
+		  let data = '';
 
-        return filteredChannels;
-      }, {});
-    }
+		  res.on('data', (chunk) => {
+			data += chunk;
+		  });
 
-    function getPlexToken(countryCode) {
-  var headers = {
-    'Accept': 'application/json, text/javascript, */*; q=0.01',
-    'Accept-Language': 'en',
-    'Origin': 'https://app.plex.tv',
-    'Referer': 'https://app.plex.tv/',
-    'Sec-Ch-Ua-Mobile': '?0',
-    'Sec-Ch-Ua-Platform': '"Linux"',
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Mode': 'cors',
-    'Sec-Fetch-Site': 'same-site',
-    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-  };
+		  res.on('end', () => {
+			if (res.statusCode === 200 || res.statusCode === 201) {
+			  const responseData = JSON.parse(data);
+			  const token = responseData.authToken;
+			  resolve(token);
+			} else {
+			  reject(new Error(`Failed to fetch token. Status code: ${res.statusCode}`));
+			}
+		  });
+		});
 
-  var params = {
-    'X-Plex-Product': 'Plex Web',
-    'X-Plex-Version': '4.126.1',
-    'X-Plex-Client-Identifier': Utilities.getUuid(),  // Generate a unique identifier
-    'X-Plex-Language': 'en',
-    'X-Plex-Platform': 'Chrome',
-    'X-Plex-Platform-Version': '123.0',
-    'X-Plex-Features': 'external-media,indirect-media,hub-style-list',
-    'X-Plex-Model': 'hosted',
-    'X-Plex-Device': 'Linux',
-    'X-Plex-Device-Name': 'Chrome',
-    'X-Plex-Device-Screen-Resolution': '1282x929,1920x1080',
-  };
+		req.on('error', (e) => {
+		  reject(e);
+		});
 
-  // Update headers with the X-Forwarded-For if necessary
-  var xForwardedForMap = {
-    'uk': '178.238.11.6',
-    'us': '185.236.200.172',
-    'ca': '192.206.151.131',
-    // Add more country codes if needed
-  };
+		req.end();
+	  });
+	}
 
-  if (xForwardedForMap.hasOwnProperty(countryCode)) {
-    headers['X-Forwarded-For'] = xForwardedForMap[countryCode];
-  }
+	function encodeParams(params) {
+	  return Object.keys(params).map((key) => {
+		return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
+	  }).join('&');
+	}
 
-  var url = 'https://clients.plex.tv/api/v2/users/anonymous';
-
-  // Set up the fetch options with parameters and headers
-  var options = {
-    'method': 'post',
-    'headers': headers,
-    'muteHttpExceptions': true  // Get response even on error codes
-  };
-
-  // Send the request
-  var response = UrlFetchApp.fetch(url + "?" + encodeParams(params), options);
-
-   // Check response code
-  if (response.getResponseCode() == 200 || response.getResponseCode() == 201) {
-    var responseData = JSON.parse(response.getContentText());
-    var token = responseData.authToken; // Grab the auth token from response
-    Logger.log("Token: " + token);
-    return token;
-  } else {
-    Logger.log("Error fetching token: " + response.getResponseCode());
-    return null;
-  }
-}
-
-// Helper function to encode the parameters for the URL
-function encodeParams(params) {
-  return Object.keys(params).map(function(key) {
-    return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
-  }).join('&');
-}
+	// Custom UUIDv4 generator
+	function uuidv4() {
+	  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+		var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+		return v.toString(16);
+	  });
+	}
 
     groupExtractionRequired = true;
   } else if (data.regions) {
     // Channels are inside regions, no special group extraction needed
     const regions = data.regions;
 
-    // Populate regionNames for Plex using the provided map
     if (service.toLowerCase() === 'plex') {
       for (let regionKey in regions) {
         regionNames[regionKey] = regionNameMap[regionKey] || regionKey.toUpperCase();
       }
     }
 
-    if (region === 'all') {
-      for (let regionKey in regions) {
-        for (let channelKey in regions[regionKey].channels) {
-          const regionChannel = { ...regions[regionKey].channels[channelKey], region: regions[regionKey].name || regionKey.toUpperCase() };
+	if (region === 'all') {
+	  for (let regionKey in regions) {
+		for (let channelKey in regions[regionKey].channels) {
+		  const regionChannel = { ...regions[regionKey].channels[channelKey], region: regions[regionKey].name || regionKey.toUpperCase() };
 
-          // Generate a unique channelId for each region to avoid overwriting
-          const uniqueChannelId = `${channelKey}-${regionKey}`;
-          
-          channels[uniqueChannelId] = regionChannel;
-        }
-      }
-    }  else if (regions[region]) {
+		  // Generate a unique channelId for each region to avoid overwriting
+		  const uniqueChannelId = `${channelKey}-${regionKey}`;
+		  
+		  channels[uniqueChannelId] = regionChannel;
+		}
+	  }
+	} else if (regions[region]) {
       channels = regions[region].channels || {};
     } else {
-      return ContentService.createTextOutput(`Error: Invalid region ${region}`).setMimeType(ContentService.MimeType.TEXT);
+      res.writeHead(400, { 'Content-Type': 'text/plain' });
+      return res.end(`Error: Invalid region ${region}`);
     }
   } else {
-    return ContentService.createTextOutput('Error: Invalid data format').setMimeType(ContentService.MimeType.TEXT);
+    res.writeHead(400, { 'Content-Type': 'text/plain' });
+    return res.end('Error: Invalid data format');
   }
 
   const startChno = params.start_chno ? parseInt(params.start_chno) : null;
-  const sort = params.sort || 'name';
   const include = (params.include || '').split(',').filter(Boolean);
   const exclude = (params.exclude || '').split(',').filter(Boolean);
 
-  let output = `#EXTM3U url-tvg="https://github.com/matthuisman/i.mjh.nz/raw/master/` + service + `/${region}.xml.gz"\n`;
-  
-  // Add this condition to set EPG to "all" for Roku regardless of region
+  let output = `#EXTM3U url-tvg="https://github.com/matthuisman/i.mjh.nz/raw/master/${service}/${region}.xml.gz"\n`;
+
   if (service.toLowerCase() === 'roku') {
     output = `#EXTM3U url-tvg="https://github.com/matthuisman/i.mjh.nz/raw/master/roku/all.xml.gz"\n`;
   }
@@ -230,25 +221,20 @@ function encodeParams(params) {
   const sortedKeys = Object.keys(channels).sort((a, b) => {
     const chA = channels[a];
     const chB = channels[b];
-    return sort === 'chno' ? (chA.chno - chB.chno) : chA.name.localeCompare(chB.name);
+     return sort === 'chno' ? (chA.chno - chB.chno) : chA.name.localeCompare(chB.name);
   });
 
   sortedKeys.forEach(key => {
     const channel = channels[key];
-    const { logo, name, url, regions } = channel; // Extract regions from channel
+    const { logo, name, url, regions } = channel; 
     const channelId = `${service}-${key}`;
 
-    // If group extraction is required (channels are outside regions), use the first group from the groups array
-    let group = groupExtractionRequired
-      ? (channel.group || '') // Avoid adding the region name here
-      : (channel.group || '');
-	  
-	// Add this condition to remove the group title for Roku
-	if (service.toLowerCase() === 'roku') {
-	  group = ''; // No group title for Roku
-	}
+    let group = groupExtractionRequired ? (channel.group || '') : (channel.group || '');
 
-    // Handle group-title for Plex
+    if (service.toLowerCase() === 'roku') {
+      group = '';
+    }
+
     if (service.toLowerCase() === 'plex' && region === 'all' && regions && regions.length > 0) {
       regions.forEach(regionCode => {
         const regionFullName = regionNameMap[regionCode] || regionCode.toUpperCase();
@@ -266,9 +252,8 @@ function encodeParams(params) {
         }
       });
     } else {
-      // Handle group-title for SamsungTVPlus and PlutoTV when region is "all"
       if ((service.toLowerCase() === 'samsungtvplus' || service.toLowerCase() === 'plutotv') && region === 'all' && channel.region) {
-        group = channel.region;  // Set group-title to region name only
+        group = channel.region;
       } else if (region === 'all' && channel.region) {
         const regionCode = channel.region ? channel.region.toUpperCase() : '';
         if (regionCode) {
@@ -289,71 +274,269 @@ function encodeParams(params) {
       }
     }
   });
+  
+	if (service.toLowerCase() === 'plex') {	 
+	  try {
+		const plexToken = await getPlexToken();
 
-  if (service.toLowerCase() === 'plex') {
-	  // Fetch the Plex token
-	  const plexToken = getPlexToken(); // You can pass the region if needed
-	  
-	  if (plexToken) {
-		// Perform the string replacements for Plex only if a valid token is returned
-		output = output.replace(/https:\/\/jmp2\.uk\/Plex\//g, 'https://epg.provider.plex.tv/library/parts/');
-		output = output.replace(/\.m3u8/g, `.m3u8?X-Plex-Token=${plexToken}`);
-
-		// Log the modified output for debugging
-		Logger.log('Modified output for Plex: ' + output);
-	  } else {		
-		Logger.log('Plex token not retrieved. Skipping token replacement.');
+		if (plexToken) {		
+		  output = output.replace(/https:\/\/jmp2\.uk\/Plex\//g, 'https://epg.provider.plex.tv/library/parts/');
+		  output = output.replace(/\.m3u8/g, `.m3u8?X-Plex-Token=${plexToken}`);
+		  
+		  //console.log('Modified output for Plex: ', output);
+		} else {		
+		  console.log('Plex token not retrieved. Skipping token replacement.');
+		}
+	  } catch (err) {
+		console.error('Failed to get Plex token:', err.message);		
 	  }
 	}
 
+  
   output = output.replace(/tvg-id="(.*?)-\w{2}"/g, 'tvg-id="$1"');
 
-  return ContentService.createTextOutput(output).setMimeType(ContentService.MimeType.TEXT);
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end(output);
+});
+
+// Function to handle the home page request
+function handleHomePage(res) {
+  // Serve the HTML content for the home page
+  res.writeHead(200, { 'Content-Type': 'text/html' });
+  res.end(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Multi-Service M3U8 Playlist</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          background-color: #f4f4f9;
+          color: #333;
+          margin: 0;
+          padding: 20px;
+        }
+        h1 {
+          color: #2c3e50;
+        }
+        p, ul {
+          line-height: 1.6;
+        }
+        pre {
+          background-color: #eaeaea;
+          padding: 10px;
+          border-radius: 5px;
+          overflow: auto;
+        }
+        code {
+          color: #c0392b;
+        }
+        .container {
+          max-width: 800px;
+          margin: 0 auto;
+        }
+        .highlight {
+          font-weight: bold;
+          color: #e74c3c;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>Multi-Service M3U8 Playlist</h1>
+        <h2>Script Access URL</h2>
+        <p>
+          Use the following URL to access the hosted script. Replace the 
+          <span class="highlight">ADD_REGION</span> and 
+          <span class="highlight">ADD_SERVICE</span> placeholders with your desired values:
+        </p>
+        <pre><code id="access-url"></code></pre>
+        <p>
+          After customizing the URL by replacing the <span class="highlight">ADD_REGION</span> and <span class="highlight">ADD_SERVICE</span> placeholders (e.g., \`us\` for the US region and \`PlutoTV\` for the service), copy the complete URL and paste it into the "Add Playlist" or "M3U8 URL" section of your IPTV application. Once added, the app will load both the channels and the guide information.
+        </p>
+  
+        <h2>Available Service Parameter Values</h2>
+        <ul>
+          <li>Plex</li>
+          <li>Roku</li>
+          <li>SamsungTVPlus</li>
+          <li>PlutoTV</li>
+          <li>PBS</li>
+          <li>PBSKids</li>
+          <li>Stirr</li>
+        </ul>
+
+        <h2>Available Region Parameter Values</h2>
+        <ul>
+          <li><code>all</code> (for all regions)</li>
+          <li><code>ar</code> (Argentina)</li>
+          <li><code>br</code> (Brazil)</li>
+          <li><code>ca</code> (Canada)</li>
+          <li><code>cl</code> (Chile)</li>
+          <li><code>de</code> (Germany)</li>
+          <li><code>dk</code> (Denmark)</li>
+          <li><code>es</code> (Spain)</li>
+          <li><code>fr</code> (France)</li>
+          <li><code>gb</code> (United Kingdom)</li>
+          <li><code>mx</code> (Mexico)</li>
+          <li><code>no</code> (Norway)</li>
+          <li><code>se</code> (Sweden)</li>
+          <li><code>us</code> (United States)</li>
+        </ul>
+
+        <h2>Available Sorting Parameter Values (optional)</h2>
+        <ul>
+          <li><code>name</code> (default): Sorts the channels alphabetically by their name.</li>
+          <li><code>chno</code>: Sorts the channels by their assigned channel number.</li>
+        </ul>
+      </div>
+
+      <script>
+        const origin = window.location.origin;
+        const accessUrl = \`\${origin}?region=ADD_REGION&service=ADD_SERVICE\`;
+
+        document.getElementById('access-url').textContent = accessUrl;
+      </script>
+    </body>
+    </html>
+  `);
 }
 
+
+// Fetch JSON data from the provided URL
+function fetchJson(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }).on('error', (error) => {
+      reject(error);
+    });
+  });
+}
+
+// Handle Tubi service 
+async function handleTubi() {
+  const playlistUrl = 'https://github.com/dtankdempse/tubi-m3u/raw/refs/heads/main/tubi_playlist_us.m3u';
+  const epgUrl = 'https://raw.githubusercontent.com/dtankdempse/tubi-m3u/refs/heads/main/tubi_epg_us.xml';
+
+  return new Promise((resolve, reject) => {
+    try {
+      https.get(playlistUrl, (res) => {
+        let data = '';
+
+        if (res.statusCode === 302 && res.headers.location) {
+          https.get(res.headers.location, (redirectRes) => {
+            let redirectData = '';
+
+            redirectRes.on('data', (chunk) => {
+              redirectData += chunk;
+            });
+
+            redirectRes.on('end', () => {
+              try {
+                if (redirectData.trim() === '') {
+                  reject('Playlist data is empty.');
+                  return;
+                }
+                let output = '';
+                output += redirectData;
+                resolve(output);
+              } catch (error) {
+                reject(`Error processing Tubi data: ${error.message}`);
+              }
+            });
+          }).on('error', (error) => {
+            reject(`Error fetching redirected Tubi data: ${error.message}`);
+          });
+          return;
+        }
+
+        if (res.statusCode !== 200) {
+          reject(`Failed to fetch playlist. Status code: ${res.statusCode}`);
+          return;
+        }
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          try {
+            if (data.trim() === '') {
+              reject('Playlist data is empty.');
+              return;
+            }
+            let output = `#EXTM3U url-tvg="${epgUrl}"
+`;
+            output += data;
+            resolve(output);
+          } catch (error) {
+            reject(`Error processing Tubi data: ${error.message}`);
+          }
+        });
+      }).on('error', (error) => {
+        reject(`Error fetching Tubi data: ${error.message}`);
+      });
+    } catch (error) {
+      reject(`Unexpected error: ${error.message}`);
+    }
+  });
+}
+
+// Handle PBS Kids
+async function handlePBSKids() {
+  const APP_URL = 'https://i.mjh.nz/PBS/.kids_app.json';
+  const EPG_URL = 'https://github.com/matthuisman/i.mjh.nz/raw/master/PBS/kids_all.xml.gz';
+  
+  try {
+    const data = await fetchJson(APP_URL);
+    let output = `#EXTM3U url-tvg="${EPG_URL}"\n`;
+
+    const sortedKeys = Object.keys(data.channels).sort((a, b) => {
+      return data.channels[a].name.toLowerCase().localeCompare(data.channels[b].name.toLowerCase());
+    });
+
+    sortedKeys.forEach(key => {
+      const channel = data.channels[key];
+      output += `#EXTINF:-1 channel-id="pbskids-${key}" tvg-id="${key}" tvg-logo="${channel.logo}", ${channel.name}\n${channel.url}\n`;
+    });
+
+    return output;
+  } catch (error) {
+    return 'Error fetching PBS Kids data: ' + error.message;
+  }
+}
+
+// Format PBS data for M3U8
 function formatPbsDataForM3U8(data) {
   let output = '#EXTM3U x-tvg-url="https://github.com/matthuisman/i.mjh.nz/raw/master/PBS/all.xml.gz"\n';
 
   Object.keys(data.channels).forEach(key => {
     const channel = data.channels[key];
-    output += '#EXTINF:-1 channel-id="pbs-' + key + '" tvg-id="' + key + '" tvg-logo="' + channel.logo + '", ' + channel.name + '\n';
-    output += '#KODIPROP:inputstream.adaptive.manifest_type=mpd\n';
-    output += '#KODIPROP:inputstream.adaptive.license_type=com.widevine.alpha\n';
-    output += '#KODIPROP:inputstream.adaptive.license_key=' + channel.license + '|Content-Type=application%2Foctet-stream&user-agent=okhttp%2F4.9.0|R{SSM}|\n';
-    output += channel.url + '|user-agent=okhttp%2F4.9.0\n';
+    output += `#EXTINF:-1 channel-id="pbs-${key}" tvg-id="${key}" tvg-logo="${channel.logo}", ${channel.name}\n`;
+    output += `#KODIPROP:inputstream.adaptive.manifest_type=mpd\n`;
+    output += `#KODIPROP:inputstream.adaptive.license_type=com.widevine.alpha\n`;
+    output += `#KODIPROP:inputstream.adaptive.license_key=${channel.license}|Content-Type=application%2Foctet-stream&user-agent=okhttp%2F4.9.0|R{SSM}|\n`;
+    output += `${channel.url}|user-agent=okhttp%2F4.9.0\n`;
   });
 
   return output;
 }
 
-function handlePBSKids() {
-  const APP_URL = 'https://i.mjh.nz/PBS/.kids_app.json';
-  const EPG_URL = 'https://github.com/matthuisman/i.mjh.nz/raw/master/PBS/kids_all.xml.gz';
-  let response;
-  
-  try {
-    response = UrlFetchApp.fetch(APP_URL);
-    const data = JSON.parse(response.getContentText());
-
-    let output = `#EXTM3U url-tvg="${EPG_URL}"\n`;
-
-    // Sort the channels by name before iterating
-    const sortedKeys = Object.keys(data.channels).sort((a, b) => {
-      const channelA = data.channels[a].name.toLowerCase();
-      const channelB = data.channels[b].name.toLowerCase();
-      return channelA.localeCompare(channelB);
-    });
-
-    sortedKeys.forEach(key => {
-      const channel = data.channels[key];
-      const { logo, name, url } = channel; // Extract necessary data from the channel
-      
-      output += `#EXTINF:-1 channel-id="pbskids-${key}" tvg-id="${key}" tvg-logo="${logo}", ${name}\n${url}\n`;
-    });
-
-    return output;
-  } catch (error) {
-    Logger.log('Error fetching PBS Kids data: ' + error.message);
-    return ContentService.createTextOutput('Error fetching PBS Kids data: ' + error.message).setMimeType(ContentService.MimeType.TEXT);
-  }
-}
+server.listen(port, hostname, () => {
+  console.log('Server running at http://localhost:4242/');
+});
