@@ -17,10 +17,8 @@ if (service.toLowerCase() === 'tubi') {
     const playlistUrl = 'https://github.com/dtankdempse/tubi-m3u/raw/refs/heads/main/tubi_playlist_us.m3u';
     const response = UrlFetchApp.fetch(playlistUrl);
     data = response.getContentText();
-
-    let epgUrl = 'https://raw.githubusercontent.com/dtankdempse/tubi-m3u/refs/heads/main/tubi_epg_us.xml';
-    let output = `#EXTM3U url-tvg="${epgUrl}"
-`;
+    
+    let output = '';
     output += data;
 
     return ContentService.createTextOutput(output)
