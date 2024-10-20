@@ -30,6 +30,7 @@ Choose one of the following services to include in the `service` parameter:
 - PBS
 - PBSKids
 - Stirr
+- Tubi
 
 ### Available Region Parameter Values
 
@@ -112,4 +113,4 @@ this [page](https://github.com/matthuisman/i.mjh.nz/).
 
 ## Disclaimer:
 
-This repository has no control over the streams, links, or the legality of the content provided by Pluto, Samsung, Stirr, Plex, PBS, and Roku. Additionally, this script simply converts the JSON files provided by i.mjh.nz into an M3U8 playlist. It is the end user's responsibility to ensure the legal use of these streams. We strongly recommend verifying that the content complies with the laws and regulations of your country before use.
+This repository has no control over the streams, links, or the legality of the content provided by Pluto, Samsung, Stirr, Tubi, Plex, PBS, and Roku. Additionally, this script simply converts the JSON files provided by i.mjh.nz into an M3U8 playlist. It is the end user's responsibility to ensure the legal use of these streams. We strongly recommend verifying that the content complies with the laws and regulations of your country before use.
