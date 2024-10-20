@@ -8,7 +8,7 @@ function doGet(e) {
     return ContentService.createTextOutput('Error: No service type provided').setMimeType(ContentService.MimeType.TEXT);
   }
 
-  // Handle Tubi service without caching
+  // Handle Tubi service
 if (service.toLowerCase() === 'tubi') {
   let data;
 
