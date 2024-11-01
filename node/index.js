@@ -538,15 +538,19 @@ function formatPbsDataForM3U8(data) {
 
   Object.keys(data.channels).forEach(key => {
     const channel = data.channels[key];
-    output += `#EXTINF:-1 channel-id="pbs-${key}" tvg-name="${channel.name}" tvg-id="${key}" tvg-logo="${channel.logo}", ${channel.name}\n`;
-    output += `#KODIPROP:inputstream.adaptive.manifest_type=mpd\n`;
-    output += `#KODIPROP:inputstream.adaptive.license_type=com.widevine.alpha\n`;
-    output += `#KODIPROP:inputstream.adaptive.license_key=${channel.license}|Content-Type=application%2Foctet-stream&user-agent=okhttp%2F4.9.0|R{SSM}|\n`;
-    output += `${channel.url}|user-agent=okhttp%2F4.9.0\n`;
+    
+    if (channel.name && channel.logo && channel.license && channel.url) {
+      output += `#EXTINF:-1 channel-id="pbs-${key}" tvg-name="${channel.name}" tvg-id="${key}" tvg-logo="${channel.logo}", ${channel.name}\n`;
+      output += `#KODIPROP:inputstream.adaptive.manifest_type=mpd\n`;
+      output += `#KODIPROP:inputstream.adaptive.license_type=com.widevine.alpha\n`;
+      output += `#KODIPROP:inputstream.adaptive.license_key=${channel.license}|Content-Type=application%2Foctet-stream&user-agent=okhttp%2F4.9.0|R{SSM}|\n`;
+      output += `${channel.url}|user-agent=okhttp%2F4.9.0\n`;
+    }
   });
 
   return output;
 }
+
 
 server.listen(port, hostname, () => {
   console.log('Server running at http://localhost:4242/');
