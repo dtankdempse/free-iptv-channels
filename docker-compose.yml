@@ -1,0 +1,7 @@
+version: '3.8'
+
+services:
+  iptv-app:
+    image: dtankdemp/free-iptv-channels
+    ports:
+      - "8765:4242"
