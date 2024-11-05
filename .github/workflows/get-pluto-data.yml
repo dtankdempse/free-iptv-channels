@@ -24,7 +24,7 @@ jobs:
         php-version: '8.0'
     
     - name: Run Pluto Data Script
-      run: php php/grab_pluto_data.php
+      run: php php/get_pluto.php
       continue-on-error: true
 
     - name: List Files in pluto Directory
