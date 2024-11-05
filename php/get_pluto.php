@@ -45,7 +45,7 @@ function processEPG($channels) {
     });
 	
     // Hardcoded URL for the EPG file
-    $epgUrl = "https://raw.githubusercontent.com/dtankdempse/public-files/main/pluto/us.xml";
+    $epgUrl = "https://raw.githubusercontent.com/dtankdempse/free-iptv-channels/refs/heads/main/pluto/us.xml";
 
     // Add the url-tvg attribute to the M3U8 playlist
     $m3u8 = "#EXTM3U url-tvg=\"{$epgUrl}\"\n";
