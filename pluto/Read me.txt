@@ -1,0 +1,1 @@
+Do not use the us.m3u8 file directly from this directory.
