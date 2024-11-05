@@ -1,4 +1,4 @@
-#EXTM3U url-tvg="https://raw.githubusercontent.com/dtankdempse/public-files/main/pluto/us.xml"
+#EXTM3U url-tvg="https://raw.githubusercontent.com/dtankdempse/free-iptv-channels/refs/heads/main/pluto/us.xml"
 #EXTINF:0 tvg-id="00s-replay" tvg-logo="http://images.pluto.tv/channels/62ba60f059624e000781c436/colorLogoPNG.png" group-title="Movies", 00s Replay
 http://cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv/stitch/hls/channel/62ba60f059624e000781c436/master.m3u8?advertisingId=&appName=web&appVersion=5.2.2-d60060c7283e0978cc63ba036956b5c1657f8eba&architecture=&buildVersion=&clientTime=&deviceDNT=0&deviceId=7d843efc-f67f-3e15-946a-afe553e37c69&deviceLat=33.6647&deviceLon=-117.1743&deviceMake=Chrome&deviceModel=Chrome&deviceType=web&deviceVersion=80.0.3987.149&includeExtendedEvents=false&marketingRegion=US&sid=cf7f6a7ab07b&userId=
 
