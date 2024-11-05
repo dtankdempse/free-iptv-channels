@@ -5,7 +5,7 @@
 [<img src="https://i.imgur.com/fjfgTSm.jpeg" alt="Deploy to Fly.io" height="30"/>](https://fly.io/launch?source=https://github.com/dtankdempse/free-iptv-channels)
 [<img src="https://oneclick.amplifyapp.com/button.svg" alt="Deploy to AWS Amplify" height="30"/>](https://console.aws.amazon.com/amplify/home#/deploy?repo=https://github.com/dtankdempse/free-iptv-channels)
 
-**Note:** PlutoTV is currently available only via the `multiservice21` hosted script and provides a playlist limited to the US region. Since Matt has removed the Pluto service from his site, I'm working on a way to include additional regions. This setup is temporary until a more permanent solution is available. Additionally, Matt's EPG data is incompatible with this configuration, so please use the EPG found [here](https://raw.githubusercontent.com/dtankdempse/free-iptv-channels/refs/heads/main/pluto/us.xml).
+**Notice:** PlutoTV is currently available only via the `multiservice21` hosted script and provides a playlist limited to the US region. Since Matt has removed the Pluto service from his site, I'm working on a way to include additional regions. This setup is temporary until a more permanent solution is available. Additionally, Matt's EPG data is incompatible with this configuration, so please use the EPG found [here](https://raw.githubusercontent.com/dtankdempse/free-iptv-channels/refs/heads/main/pluto/us.xml).
 
 
 # Pluto, Samsung, Stirr, Tubi, Plex, PBS and Roku Playlist (M3U8)
