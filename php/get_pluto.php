@@ -187,9 +187,9 @@ function formatTime($timestamp) {
 }
 
 function saveFile($filename, $content) {
-    $filePath = $_SERVER['DOCUMENT_ROOT'] . $filename;
+    $filePath = __DIR__ . '/../pluto/' . basename($filename);
     file_put_contents($filePath, $content);
-    echo "[SUCCESS] Saved file: {$filename}" . PHP_EOL;
+    echo "[SUCCESS] Saved file: {$filePath}" . PHP_EOL;
 }
 
 // Run the function to grab the EPG
