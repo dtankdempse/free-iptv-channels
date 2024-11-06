@@ -5,12 +5,30 @@ const url = require('url');
 const hostname = '0.0.0.0';
 const port = 4242;
 
+const regionNameMap = {
+  ar: "Argentina",
+  br: "Brazil",
+  ca: "Canada",
+  cl: "Chile",
+  de: "Germany",
+  dk: "Denmark",
+  es: "Spain",
+  fr: "France",
+  gb: "United Kingdom",
+  it: "Italy",
+  mx: "Mexico",
+  no: "Norway",
+  se: "Sweden",
+  us: "United States"
+};
+
 const server = http.createServer(async (req, res) => {
   const parsedUrl = url.parse(req.url, true);
   const params = parsedUrl.query;
   const pathname = parsedUrl.pathname;
   const region = (params.region || 'us').toLowerCase().trim();
   const service = params.service;
+  const sort = params.sort || 'name';
   
     // Check for the root path "/"
   if (pathname === '/' && !parsedUrl.query.service) {
@@ -21,6 +39,13 @@ const server = http.createServer(async (req, res) => {
   if (!service) {
     res.writeHead(400, { 'Content-Type': 'text/plain' });
     return res.end('Error: No service type provided');
+  }
+  
+  // Handle Pluto TV service
+  if (service.toLowerCase() === 'plutotv') {
+    const plutoOutput = await handlePlutoDirect(region, sort);
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    return res.end(plutoOutput);
   }
   
   if (service.toLowerCase() === 'tubi') {
@@ -51,7 +76,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   let channels = {};
-  const sort = params.sort || 'name';
   let groupExtractionRequired = false;
   let regionNames = {}; // For Plex, to map region codes to full names
 
@@ -415,6 +439,54 @@ function handleHomePage(res) {
     </html>`);
 }
 
+// Function to handle the Pluto TV service
+async function handlePlutoDirect(region, sort) {
+  const PLUTO_URL = 'https://i.mjh.nz/PlutoTV/.channels.json';
+  const STREAM_URL_TEMPLATE = 'https://jmp2.uk/plu-{id}.m3u8';
+
+  try {  
+    const data = await fetchJson(PLUTO_URL);
+    let output = `#EXTM3U url-tvg="https://github.com/matthuisman/i.mjh.nz/raw/master/PlutoTV/${region}.xml.gz"\n`;
+    let channels = {};
+   
+    if (region === 'all') {
+      for (const regionKey in data.regions) {
+        const regionData = data.regions[regionKey];
+        const regionFullName = regionNameMap[regionKey] || regionKey.toUpperCase();
+        for (const channelKey in regionData.channels) {
+          const channel = { ...regionData.channels[channelKey], region: regionFullName };
+          const uniqueChannelId = `${channelKey}-${regionKey}`;
+          channels[uniqueChannelId] = channel;
+        }
+      }
+    } else {      
+      if (!data.regions[region]) {
+        return `Error: Region '${region}' not found in Pluto data`;
+      }
+      channels = data.regions[region].channels || {};
+    }
+   
+    const sortedChannelIds = Object.keys(channels).sort((a, b) => {
+      const channelA = channels[a];
+      const channelB = channels[b];
+      return sort === 'chno' ? (channelA.chno - channelB.chno) : channelA.name.localeCompare(channelB.name);
+    });
+   
+    sortedChannelIds.forEach(channelId => {
+      const channel = channels[channelId];
+      const { chno, name, group, logo, region: channelRegion } = channel;
+      const groupTitle = region === 'all' ? `${group} (${channelRegion})` : group;
+
+      output += `#EXTINF:-1 tvg-id="${channelId}" tvg-chno="${chno}" tvg-name="${name}" tvg-logo="${logo}" group-title="${groupTitle}", ${name}\n`;
+      output += STREAM_URL_TEMPLATE.replace('{id}', channelId.split('-')[0]) + '\n';
+    });
+
+    return output;
+  } catch (error) {
+    console.error('Error fetching Pluto TV data:', error.message);
+    return 'Error fetching Pluto data: ' + error.message;
+  }
+}
 
 // Fetch JSON data from the provided URL
 function fetchJson(url) {
