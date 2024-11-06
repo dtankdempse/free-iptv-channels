@@ -48,6 +48,13 @@ const server = http.createServer(async (req, res) => {
     return res.end(plutoOutput);
   }
   
+  // Handle Plex service
+  if (service.toLowerCase() === 'plex') {
+    const plexOutput = await handlePlex(region, sort);
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    return res.end(plexOutput);
+  }
+  
   if (service.toLowerCase() === 'tubi') {
     const tubiOutput = await handleTubi();
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -77,138 +84,14 @@ const server = http.createServer(async (req, res) => {
 
   let channels = {};
   let groupExtractionRequired = false;
-  let regionNames = {}; // For Plex, to map region codes to full names
-
-  // Map of region codes to full names for Plex
-  const regionNameMap = {
-    us: "USA",
-    mx: "Mexico",
-    es: "Spain",
-    ca: "Canada",
-    au: "Australia",
-    nz: "New Zealand"
-  };
 
   if (data.channels) {
-    // Channels are directly in the data object, and group extraction is needed
     channels = data.channels;
- 
-	// Plex-specific genre mapping when region is NOT 'all'
-	if (service.toLowerCase() === 'plex' && region !== 'all') {
-	  const channelsJsonUrl = 'https://raw.githubusercontent.com/dtankdempse/free-iptv-channels/main/plex/channels.json';
-	  let plexChannels;
-	  try {
-		plexChannels = await fetchJson(channelsJsonUrl);
-	  } catch (error) {
-		res.writeHead(500, { 'Content-Type': 'text/plain' });
-		return res.end('Error: Failed to fetch Plex channels');
-	  }
-
-	  channels = Object.keys(channels).reduce((filteredChannels, key) => {
-		const channel = channels[key];
-		if (channel.regions && channel.regions.includes(region)) {
-		  // Search for the channel in the Plex channels JSON by title
-		  const plexChannel = plexChannels.find(ch => ch.Title === channel.name);
-
-		  // Use the genre from the Plex channels JSON for group-title, default to "Uncategorized"
-		  const genre = plexChannel && plexChannel.Genre ? plexChannel.Genre : 'Uncategorized';
-		  
-		  // Assign the genre to the group-title
-		  filteredChannels[key] = { 
-			...channel, 
-			group: `${genre}`
-		  };
-		}
-		return filteredChannels;
-	  }, {});
-	}
-
-	function getPlexToken(countryCode = null) {
-	  return new Promise((resolve, reject) => {
-		const headers = {
-		  'Accept': 'application/json, text/javascript, */*; q=0.01',
-		  'Accept-Language': 'en',
-		  'Origin': 'https://app.plex.tv',
-		  'Referer': 'https://app.plex.tv/',
-		  'Sec-Ch-Ua-Mobile': '?0',
-		  'Sec-Ch-Ua-Platform': '"Linux"',
-		  'Sec-Fetch-Dest': 'empty',
-		  'Sec-Fetch-Mode': 'cors',
-		  'Sec-Fetch-Site': 'same-site',
-		  'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-		};
-
-		const params = {
-		  'X-Plex-Product': 'Plex Web',
-		  'X-Plex-Version': '4.126.1',
-		  'X-Plex-Client-Identifier': uuidv4(),  // Generate a unique identifier
-		  'X-Plex-Language': 'en',
-		  'X-Plex-Platform': 'Chrome',
-		  'X-Plex-Platform-Version': '123.0',
-		  'X-Plex-Features': 'external-media,indirect-media,hub-style-list',
-		  'X-Plex-Model': 'hosted',
-		  'X-Plex-Device': 'Linux',
-		  'X-Plex-Device-Name': 'Chrome',
-		  'X-Plex-Device-Screen-Resolution': '1282x929,1920x1080',
-		};
-
-		const plexUrl = `https://clients.plex.tv/api/v2/users/anonymous?${encodeParams(params)}`;
-
-		const options = {
-		  method: 'POST',
-		  headers: headers,
-		};
-
-		const req = https.request(plexUrl, options, (res) => {
-		  let data = '';
-
-		  res.on('data', (chunk) => {
-			data += chunk;
-		  });
-
-		  res.on('end', () => {
-			if (res.statusCode === 200 || res.statusCode === 201) {
-			  const responseData = JSON.parse(data);
-			  const token = responseData.authToken;
-			  resolve(token);
-			} else {
-			  reject(new Error(`Failed to fetch token. Status code: ${res.statusCode}`));
-			}
-		  });
-		});
-
-		req.on('error', (e) => {
-		  reject(e);
-		});
-
-		req.end();
-	  });
-	}
-
-	function encodeParams(params) {
-	  return Object.keys(params).map((key) => {
-		return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
-	  }).join('&');
-	}
-
-	// Custom UUIDv4 generator
-	function uuidv4() {
-	  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-		var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-		return v.toString(16);
-	  });
-	}
-
     groupExtractionRequired = true;
+	
   } else if (data.regions) {
-    // Channels are inside regions, no special group extraction needed
+	  
     const regions = data.regions;
-
-    if (service.toLowerCase() === 'plex') {
-      for (let regionKey in regions) {
-        regionNames[regionKey] = regionNameMap[regionKey] || regionKey.toUpperCase();
-      }
-    }
 
 	if (region === 'all') {
 	  for (let regionKey in regions) {
@@ -276,7 +159,7 @@ const server = http.createServer(async (req, res) => {
         }
       });
     } else {
-      if ((service.toLowerCase() === 'samsungtvplus' || service.toLowerCase() === 'plutotv') && region === 'all' && channel.region) {
+      if (service.toLowerCase() === 'samsungtvplus' && region === 'all' && channel.region) {
         group = channel.region;
       } else if (region === 'all' && channel.region) {
         const regionCode = channel.region ? channel.region.toUpperCase() : '';
@@ -297,25 +180,7 @@ const server = http.createServer(async (req, res) => {
         output += `#EXTINF:-1 channel-id="${channelId}" tvg-name="${name}" tvg-id="${key}" tvg-logo="${logo}" group-title="${group}"${chno},${name}\n${url}\n`;
       }
     }
-  });
-  
-	if (service.toLowerCase() === 'plex') {	 
-	  try {
-		const plexToken = await getPlexToken();
-
-		if (plexToken) {		
-		  output = output.replace(/https:\/\/jmp2\.uk\/Plex\//g, 'https://epg.provider.plex.tv/library/parts/');
-		  output = output.replace(/\.m3u8/g, `.m3u8?X-Plex-Token=${plexToken}`);
-		  
-		  //console.log('Modified output for Plex: ', output);
-		} else {		
-		  console.log('Plex token not retrieved. Skipping token replacement.');
-		}
-	  } catch (err) {
-		console.error('Failed to get Plex token:', err.message);		
-	  }
-	}
-
+  });  
   
   output = output.replace(/tvg-id="(.*?)-\w{2}"/g, 'tvg-id="$1"');
 
@@ -486,6 +351,85 @@ async function handlePlutoDirect(region, sort) {
   } catch (error) {
     console.error('Error fetching Pluto TV data:', error.message);
     return 'Error fetching Pluto data: ' + error.message;
+  }
+}
+
+// Function to handle the Plex service
+async function handlePlex(region, sort) {
+  const PLEX_URL = 'https://i.mjh.nz/Plex/.channels.json';
+  const CHANNELS_JSON_URL = 'https://raw.githubusercontent.com/dtankdempse/free-iptv-channels/main/plex/channels.json';
+  const STREAM_URL_TEMPLATE = 'https://jmp2.uk/plex-{id}.m3u8';
+  
+  sort = sort || 'name';
+  let output = `#EXTM3U url-tvg="https://github.com/matthuisman/i.mjh.nz/raw/master/Plex/${region}.xml.gz"\n`;
+  const regionNameMap = {
+    us: "United States",
+    mx: "Mexico",
+    es: "Spain",
+    ca: "Canada",
+    au: "Australia",
+    nz: "New Zealand"
+  };
+
+  try {
+    // Fetch the Plex data
+    console.log('Fetching new Plex data from URL:', PLEX_URL);
+    const data = await fetchJson(PLEX_URL);
+
+    console.log('Fetching new channels.json data from URL:', CHANNELS_JSON_URL);
+    const plexChannels = await fetchJson(CHANNELS_JSON_URL);
+
+    let channels = {};
+
+    // Process channels based on region
+    if (region === 'all') {
+      for (const regionKey in data.regions) {
+        const regionData = data.regions[regionKey];
+        const regionFullName = regionNameMap[regionKey] || regionKey.toUpperCase();
+
+        for (const channelKey in data.channels) {
+          const channel = data.channels[channelKey];
+          if (channel.regions.includes(regionKey)) {
+            const uniqueChannelId = `${channelKey}-${regionKey}`;
+            channels[uniqueChannelId] = { ...channel, region: regionFullName, group: regionFullName, originalId: channelKey };
+          }
+        }
+      }
+    } else {
+      if (!data.regions[region]) {
+        throw new Error(`Error: Region '${region}' not found in Plex data.`);
+      }
+      for (const channelKey in data.channels) {
+        const channel = data.channels[channelKey];
+        if (channel.regions.includes(region)) {
+          const matchingChannel = plexChannels.find(ch => ch.Title === channel.name);
+          const genre = matchingChannel && matchingChannel.Genre ? matchingChannel.Genre : 'Uncategorized';
+          channels[channelKey] = { ...channel, group: genre, originalId: channelKey };
+        }
+      }
+    }
+
+    // Sort channels based on the specified sorting criteria
+    const sortedChannelIds = Object.keys(channels).sort((a, b) => {
+      const channelA = channels[a];
+      const channelB = channels[b];
+      return sort === 'chno' ? (channelA.chno - channelB.chno) : channelA.name.localeCompare(channelB.name);
+    });
+
+    sortedChannelIds.forEach(channelId => {
+      const channel = channels[channelId];
+      const { chno, name, logo, group, originalId } = channel;
+
+      output += `#EXTINF:-1 channel-id="${channelId}" tvg-id="${channelId}" tvg-chno="${chno || ''}" tvg-name="${name}" tvg-logo="${logo}" group-title="${group}", ${name}\n`;
+      output += STREAM_URL_TEMPLATE.replace('{id}', originalId) + '\n';
+    });
+
+    output = output.replace(/tvg-id="(.*?)-\w{2}"/g, 'tvg-id="$1"');
+    return output;
+
+  } catch (error) {
+    console.error('Error fetching Plex or channels data:', error.message);
+    return `Error: ${error.message}`;
   }
 }
 
