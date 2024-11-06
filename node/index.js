@@ -477,10 +477,11 @@ async function handlePlutoDirect(region, sort) {
       const { chno, name, group, logo, region: channelRegion } = channel;
       const groupTitle = region === 'all' ? `${channelRegion}` : group;
 
-      output += `#EXTINF:-1 tvg-id="${channelId}" tvg-chno="${chno}" tvg-name="${name}" tvg-logo="${logo}" group-title="${groupTitle}", ${name}\n`;
+      output += `#EXTINF:-1 channel-id="${channelId}" tvg-id="${channelId}" tvg-chno="${chno}" tvg-name="${name}" tvg-logo="${logo}" group-title="${groupTitle}", ${name}\n`;
       output += STREAM_URL_TEMPLATE.replace('{id}', channelId.split('-')[0]) + '\n';
     });
-
+	
+	output = output.replace(/tvg-id="(.*?)-\w{2}"/g, 'tvg-id="$1"');
     return output;
   } catch (error) {
     console.error('Error fetching Pluto TV data:', error.message);
