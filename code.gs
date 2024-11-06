@@ -2,32 +2,38 @@ function doGet(e) {
   const params = e.parameter;
   const region = (params.region || 'us').toLowerCase().trim();
   const service = params.service;
+  const sort = params.sort || 'name';
 
   // Check if the service parameter is missing
   if (!service) {
     return ContentService.createTextOutput('Error: No service type provided').setMimeType(ContentService.MimeType.TEXT);
   }
 
-  // Handle Tubi service
-if (service.toLowerCase() === 'tubi') {
-  let data;
-
-  try {
-    Logger.log('Fetching new Tubi data');
-    const playlistUrl = 'https://github.com/dtankdempse/tubi-m3u/raw/refs/heads/main/tubi_playlist_us.m3u';
-    const response = UrlFetchApp.fetch(playlistUrl);
-    data = response.getContentText();
-    
-    let output = '';
-    output += data;
-
-    return ContentService.createTextOutput(output)
-      .setMimeType(ContentService.MimeType.TEXT);
-  } catch (error) {
-    Logger.log('Error fetching Tubi data: ' + error.message);
-    return handleError('Error fetching Tubi data: ' + error.message);
+  // Handle Pluto TV service
+  if (service.toLowerCase() === 'plutotv') {
+    return handlePlutoDirect(region, sort);
   }
-}
+
+  // Handle Tubi service
+  if (service.toLowerCase() === 'tubi') {
+    let data;
+
+    try {
+      Logger.log('Fetching new Tubi data');
+      const playlistUrl = 'https://github.com/dtankdempse/tubi-m3u/raw/refs/heads/main/tubi_playlist_us.m3u';
+      const response = UrlFetchApp.fetch(playlistUrl);
+      data = response.getContentText();
+      
+      let output = '';
+      output += data;
+
+      return ContentService.createTextOutput(output)
+        .setMimeType(ContentService.MimeType.TEXT);
+    } catch (error) {
+      Logger.log('Error fetching Tubi data: ' + error.message);
+      return handleError('Error fetching Tubi data: ' + error.message);
+    }
+  }
 
   
   if (service.toLowerCase() === 'pbskids') {
@@ -216,7 +222,6 @@ function encodeParams(params) {
   }
 
   const startChno = params.start_chno ? parseInt(params.start_chno) : null;
-  const sort = params.sort || 'name';
   const include = (params.include || '').split(',').filter(Boolean);
   const exclude = (params.exclude || '').split(',').filter(Boolean);
 
@@ -329,7 +334,6 @@ function formatPbsDataForM3U8(data) {
   return output;
 }
 
-
 function handlePBSKids() {
   const APP_URL = 'https://i.mjh.nz/PBS/.kids_app.json';
   const EPG_URL = 'https://github.com/matthuisman/i.mjh.nz/raw/master/PBS/kids_all.xml.gz';
@@ -359,5 +363,73 @@ function handlePBSKids() {
   } catch (error) {
     Logger.log('Error fetching PBS Kids data: ' + error.message);
     return ContentService.createTextOutput('Error fetching PBS Kids data: ' + error.message).setMimeType(ContentService.MimeType.TEXT);
+  }
+}
+
+function handlePlutoDirect(region, sort) {
+  const PLUTO_URL = 'https://i.mjh.nz/PlutoTV/.channels.json';
+  const STREAM_URL_TEMPLATE = 'https://jmp2.uk/plu-{id}.m3u8';
+
+  const regionNameMap = {
+    ar: "Argentina",
+    br: "Brazil",
+    ca: "Canada",
+    cl: "Chile",
+    de: "Germany",
+    dk: "Denmark",
+    es: "Spain",
+    fr: "France",
+    gb: "United Kingdom",
+    it: "Italy",
+    mx: "Mexico",
+    no: "Norway",
+    se: "Sweden",
+    us: "United States"
+  };
+
+  try {   
+    const response = UrlFetchApp.fetch(PLUTO_URL);
+    const data = JSON.parse(response.getContentText());
+
+    let output = `#EXTM3U url-tvg="https://github.com/matthuisman/i.mjh.nz/raw/master/PlutoTV/${region}.xml.gz"\n`;
+    let channels = {};
+
+    if (region === 'all') {
+      for (const regionKey in data.regions) {
+        const regionData = data.regions[regionKey];
+        const regionFullName = regionNameMap[regionKey] || regionKey.toUpperCase();
+        for (const channelKey in regionData.channels) {
+          const channel = { ...regionData.channels[channelKey], region: regionFullName };
+          const uniqueChannelId = `${channelKey}-${regionKey}`;
+          channels[uniqueChannelId] = channel;
+        }
+      }
+    } else {
+      // Handle a single specified region
+      if (!data.regions[region]) {
+        return ContentService.createTextOutput(`Error: Region '${region}' not found in Pluto data`).setMimeType(ContentService.MimeType.TEXT);
+      }
+      channels = data.regions[region].channels || {};
+    }
+   
+    const sortedChannelIds = Object.keys(channels).sort((a, b) => {
+      const channelA = channels[a];
+      const channelB = channels[b];
+      return sort === 'chno' ? (channelA.chno - channelB.chno) : channelA.name.localeCompare(channelB.name);
+    });
+
+    sortedChannelIds.forEach(channelId => {
+      const channel = channels[channelId];
+      const { chno, name, group, logo, region: channelRegion } = channel;
+      const groupTitle = region === 'all' ? `${group} (${channelRegion})` : group;
+
+      output += `#EXTINF:-1 tvg-id="${channelId}" tvg-chno="${chno}" tvg-name="${name}" tvg-logo="${logo}" group-title="${groupTitle}", ${name}\n`;
+      output += STREAM_URL_TEMPLATE.replace('{id}', channelId.split('-')[0]) + '\n';
+    });
+
+    return ContentService.createTextOutput(output).setMimeType(ContentService.MimeType.TEXT);
+  } catch (error) {
+    Logger.log('Error fetching Pluto TV data: ' + error.message);
+    return ContentService.createTextOutput('Error fetching Pluto data: ' + error.message).setMimeType(ContentService.MimeType.TEXT);
   }
 }
