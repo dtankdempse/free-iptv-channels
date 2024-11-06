@@ -5,9 +5,6 @@
 [<img src="https://i.imgur.com/fjfgTSm.jpeg" alt="Deploy to Fly.io" height="30"/>](https://fly.io/launch?source=https://github.com/dtankdempse/free-iptv-channels)
 [<img src="https://oneclick.amplifyapp.com/button.svg" alt="Deploy to AWS Amplify" height="30"/>](https://console.aws.amazon.com/amplify/home#/deploy?repo=https://github.com/dtankdempse/free-iptv-channels)
 
-**Notice:** PlutoTV is currently available only via the `multiservice21` hosted script and provides a playlist limited to the US region. Since Matt has removed the Pluto service from his site, I'm working on a way to include additional regions. This setup is temporary until a more permanent solution is available. Additionally, Matt's EPG data is incompatible with this configuration, so please use the EPG found [here](https://raw.githubusercontent.com/dtankdempse/free-iptv-channels/refs/heads/main/pluto/us.xml).
-
-
 # Pluto, Samsung, Stirr, Tubi, Plex, PBS and Roku Playlist (M3U8)
 
 This script generates an m3u8 playlist from the channels provided by services such as Pluto, Samsung, Stirr, Plex, PBS, and Roku. It is based on the original script created by matthuisman, which can be found at [matthuisman's GitHub repository](https://github.com/matthuisman/i.mjh.nz).
@@ -29,7 +26,7 @@ Choose one of the following services to include in the `service` parameter:
 - Plex
 - Roku
 - SamsungTVPlus
-- PlutoTV (*currently only available for the US region*)
+- PlutoTV
 - PBS
 - PBSKids
 - Stirr
@@ -112,7 +109,7 @@ Once the server is running, you can access it locally by navigating to:
 ### EPG for TV Guide Information
 
 The EPG URLs are embedded directly within the playlists. If you'd prefer to manually add the EPG guide, you can find the relevant URLs for each service on
-this [page](https://github.com/matthuisman/i.mjh.nz/). The PlutoTV's EPG guide can be found [here](https://raw.githubusercontent.com/dtankdempse/free-iptv-channels/refs/heads/main/pluto/us.xml).
+this [page](https://github.com/matthuisman/i.mjh.nz/).
 
 ## Disclaimer:
 
