@@ -475,7 +475,7 @@ async function handlePlutoDirect(region, sort) {
     sortedChannelIds.forEach(channelId => {
       const channel = channels[channelId];
       const { chno, name, group, logo, region: channelRegion } = channel;
-      const groupTitle = region === 'all' ? `${group} (${channelRegion})` : group;
+      const groupTitle = region === 'all' ? `${channelRegion}` : group;
 
       output += `#EXTINF:-1 tvg-id="${channelId}" tvg-chno="${chno}" tvg-name="${name}" tvg-logo="${logo}" group-title="${groupTitle}", ${name}\n`;
       output += STREAM_URL_TEMPLATE.replace('{id}', channelId.split('-')[0]) + '\n';
