@@ -499,8 +499,6 @@ function handlePBS() {
 //------  Other Functions ------//
 
 function handleError(errorMessage) {
-  let errorBlob = Utilities.newBlob(errorMessage, 'text/plain', 'error.txt');
-  return ContentService.createTextOutput(errorBlob.getDataAsString())
-    .setMimeType(ContentService.MimeType.TEXT)
-    .downloadAsFile('error.txt');
+  return ContentService.createTextOutput(errorMessage)
+    .setMimeType(ContentService.MimeType.TEXT);
 }
