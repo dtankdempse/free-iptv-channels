@@ -15,7 +15,7 @@ Use the following URL to access the hosted script. Replace the `ADD_REGION` and 
 
 `https://tinyurl.com/multiservice21?region=ADD_REGION&service=ADD_SERVICE`
 
-After customizing the URL by replacing the ADD_REGION and ADD_SERVICE placeholders with your desired region and service (e.g., us for the US region and Pluto for the service), copy the complete URL and paste it into the "Add Playlist" or "M3U8 URL" section of your IPTV application. Once added, the app will load both the channels and the guide information
+After customizing the URL by replacing the ADD_REGION and ADD_SERVICE placeholders with your desired region and service (e.g., us for the US region and PlutoTV for the service), copy the complete URL and paste it into the "Add Playlist" or "M3U8 URL" section of your IPTV application. Once added, the app will load both the channels and the guide information
 
 **⚠️ Please note:** It is recommended to add the Google Apps Script to your own Google account or deploy the script to one of the other services, rather than relying on this publicly shared URL long-term.
 
