@@ -117,6 +117,6 @@ This repository has no control over the streams, links, or the legality of the c
 
 ### DMCA Notice:
 
-This repository does not contain any video files. It simply organizes web links into an M3U-formatted playlist, which are publicly accessible online through a web browser. As far as we know, these websites were given permission by copyright holders to stream and allow access to the content found on their website(s). However, if you are a copyright holder and believe that any link infringes on your rights, you can request its removal by opening an [issue](https://github.com/dtankdempse/free-iptv-channels/issues) or submitting a [pull request](https://github.com/dtankdempse/free-iptv-channels/pulls).
+This repository does not contain any video files. It simply organizes publicly accessible web links, that can be accessed by a web browser into an M3U-formatted playlist. As far as we are aware, these websites have the necessary rights from copyright holders to stream and share the content they provide. However, if you are a copyright holder and believe that any link infringes on your rights, you can request it's removal by opening an [issue](https://github.com/dtankdempse/free-iptv-channels/issues) or submitting a [pull request](https://github.com/dtankdempse/free-iptv-channels/pulls).
 
-Please be aware that requesting the removal of a link here will not affect the content hosted on the external website(s), as this repository has no control over those destinations.
+Please be aware that requesting the removal of a link here will not affect the content hosted on the external websites, as this repository has no control over the files or the content being provided.
