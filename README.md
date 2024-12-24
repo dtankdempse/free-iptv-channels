@@ -114,3 +114,9 @@ this [page](https://github.com/matthuisman/i.mjh.nz/).
 ## Disclaimer:
 
 This repository has no control over the streams, links, or the legality of the content provided by Pluto, Samsung, Stirr, Tubi, Plex, PBS, and Roku. Additionally, this script simply converts the JSON files provided by i.mjh.nz into an M3U8 playlist. It is the end user's responsibility to ensure the legal use of these streams. We strongly recommend verifying that the content complies with the laws and regulations of your country before use.
+
+## DMCA Notice:
+
+This repository does not contain any video files. It simply organizes web links into an M3U-formatted playlist, which are publicly accessible online through a web browser. As far as we know, these websites were given permission by copyright holders to stream and allow access to the content found on their website(s). However, if you are a copyright holder and believe that any link infringes on your rights, you can request its removal by opening an [issue](https://github.com/dtankdempse/free-iptv-channels/issues) or submitting a [pull request](https://github.com/dtankdempse/free-iptv-channels/pulls).
+
+Please be aware that requesting the removal of a link here will not affect the content hosted on the external website(s), as this repository has no control over those destinations.
