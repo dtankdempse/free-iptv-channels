@@ -348,6 +348,7 @@ async function handleSamsungTVPlus(region, sort) {
 // Function to handle the Roku service
 async function handleRoku(sort) {
     const ROKU_URL = 'https://i.mjh.nz/Roku/.channels.json';
+    const STREAM_URL_TEMPLATE = 'https://jmp2.uk/rok-{id}.m3u8';
 
     // Set a default for `sort` if not provided
     sort = sort || 'name';
@@ -372,15 +373,14 @@ async function handleRoku(sort) {
                 chno,
                 name,
                 groups,
-                logo,
-                mjh_url
+                logo
             } = channel;
 
             // Use the first group in `groups` array for `group-title`
             const groupTitle = groups && groups.length > 0 ? groups[0] : 'Uncategorized';
 
-            output += `#EXTINF:-1 channel-id="${channelId}" tvg-id="${channelId}" tvg-chno="${chno}" tvg-name="${name}" tvg-logo="${logo}" group-title="", ${name}\n`;
-            output += `${mjh_url}\n`;
+            output += `#EXTINF:-1 channel-id="${channelId}" tvg-id="${channelId}" tvg-chno="${chno}" tvg-name="${name}" tvg-logo="${logo}" group-title="${groupTitle}", ${name}\n`;
+            output += STREAM_URL_TEMPLATE.replace('{id}', channelId) + '\n';
         });
 
         return output;
