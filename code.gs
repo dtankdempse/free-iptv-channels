@@ -300,6 +300,7 @@ function handleSamsungTVPlus(region, sort) {
 
 function handleRoku(sort) {
   const ROKU_URL = 'https://i.mjh.nz/Roku/.channels.json';
+  const STREAM_URL_TEMPLATE = 'https://jmp2.uk/rok-{id}.m3u8';
 
   // Set a default for `sort` if not provided
   sort = sort || 'name';
@@ -336,13 +337,13 @@ function handleRoku(sort) {
 
   sortedChannelIds.forEach(channelId => {
     const channel = channels[channelId];
-    const { chno, name, description, groups, logo, mjh_url } = channel;
+    const { chno, name, description, groups, logo } = channel;
 
     // Use the first group in `groups` array for `group-title`
     const groupTitle = groups && groups.length > 0 ? groups[0] : 'Uncategorized';
 
     output += `#EXTINF:-1 channel-id="${channelId}" tvg-id="${channelId}" tvg-chno="${chno}" tvg-name="${name}" tvg-logo="${logo}" group-title="", ${name}\n`;
-    output += `${mjh_url}\n`;
+    output += STREAM_URL_TEMPLATE.replace('{id}', channelId) + '\n';
   });
 
   // Return output directly to the browser
