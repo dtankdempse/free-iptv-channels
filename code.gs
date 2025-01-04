@@ -56,7 +56,7 @@ function doGet(e) {
 //------ Service Functions ------//
 
 function handlePluto(region, sort) {
-  const PLUTO_URL = 'https://i.mjh.nz/PlutoTV/.channels.json';
+  const PLUTO_URL = 'https://i.mjh.nz/PlutoTV/.channels.json.gz';
   const STREAM_URL_TEMPLATE = 'https://jmp2.uk/plu-{id}.m3u8';
   
   sort = sort || 'name';
@@ -66,12 +66,21 @@ function handlePluto(region, sort) {
   try {
     Logger.log('Fetching new Pluto data from URL: ' + PLUTO_URL);
 
-    // Fetch JSON data directly
+    // Fetch the gzipped file
     const response = UrlFetchApp.fetch(PLUTO_URL);
-    const extractedData = response.getContentText();
+    let gzipBlob = response.getBlob();
+
+    // Set content type to application/x-gzip (Gzip Bug Workaround)
+    gzipBlob = gzipBlob.setContentType('application/x-gzip');
+
+    // Decompress the gzipped data
+    const extractedBlob = Utilities.ungzip(gzipBlob);
+    const extractedData = extractedBlob.getDataAsString();
 
     // Parse JSON data
     data = JSON.parse(extractedData);
+
+    Logger.log('Data successfully extracted and parsed.');
   } catch (error) {
     Logger.log('Error fetching or processing Pluto data: ' + error.message);
     return handleError('Error fetching Pluto data: ' + error.message);
@@ -96,27 +105,23 @@ function handlePluto(region, sort) {
   };
   let channels = {};
 
-  // If "all" is specified, gather channels from each region
   if (region === 'all') {
     for (const regionKey in data.regions) {
       const regionData = data.regions[regionKey];
       const regionFullName = regionNameMap[regionKey] || regionKey.toUpperCase();
       for (const channelKey in regionData.channels) {
         const channel = { ...regionData.channels[channelKey], region: regionFullName };
-        // Generate a unique channel ID for each region to avoid overwriting
         const uniqueChannelId = `${channelKey}-${regionKey}`;
         channels[uniqueChannelId] = channel;
       }
     }
   } else {
-    // Handle a single specified region
     if (!data.regions[region]) {
       return handleError(`Error: Region '${region}' not found in Pluto data.`);
     }
     channels = data.regions[region].channels || {};
   }
 
-  // Sort channels based on the specified sorting criteria
   const sortedChannelIds = Object.keys(channels).sort((a, b) => {
     const channelA = channels[a];
     const channelB = channels[b];
@@ -131,7 +136,6 @@ function handlePluto(region, sort) {
     const channel = channels[channelId];
     const { chno, name, description, group, logo, region: channelRegion } = channel;
 
-    // Include region name in group title when "all" is specified
     const groupTitle = region === 'all' ? `${channelRegion}` : group;
 
     output += `#EXTINF:-1 channel-id="${channelId}" tvg-id="${channelId}" tvg-chno="${chno}" tvg-name="${name}" tvg-logo="${logo}" group-title="${groupTitle}", ${name}\n`;
@@ -140,12 +144,11 @@ function handlePluto(region, sort) {
 
   output = output.replace(/tvg-id="(.*?)-\w{2}"/g, 'tvg-id="$1"');
 
-  // Return output directly to the browser
   return ContentService.createTextOutput(output).setMimeType(ContentService.MimeType.TEXT);
 }
 
 function handlePlex(region, sort) {
-  const PLEX_URL = 'https://i.mjh.nz/Plex/.channels.json';
+  const PLEX_URL = 'https://i.mjh.nz/Plex/.channels.json.gz';
   const CHANNELS_JSON_URL = 'https://raw.githubusercontent.com/dtankdempse/free-iptv-channels/main/plex/channels.json';
   const STREAM_URL_TEMPLATE = 'https://jmp2.uk/plex-{id}.m3u8';
 
@@ -155,8 +158,20 @@ function handlePlex(region, sort) {
 
   try {
     Logger.log('Fetching new Plex data from URL: ' + PLEX_URL);
+
+    // Fetch the gzipped file
     const response = UrlFetchApp.fetch(PLEX_URL);
-    data = JSON.parse(response.getContentText());
+    let gzipBlob = response.getBlob();
+
+    // Set content type to application/x-gzip (Gzip Bug Workaround)
+    gzipBlob = gzipBlob.setContentType('application/x-gzip');
+
+    // Decompress the gzipped data
+    const extractedBlob = Utilities.ungzip(gzipBlob);
+    const extractedData = extractedBlob.getDataAsString();
+
+    // Parse JSON data
+    data = JSON.parse(extractedData);
 
     Logger.log('Fetching new channels.json data from URL: ' + CHANNELS_JSON_URL);
     const channelsResponse = UrlFetchApp.fetch(CHANNELS_JSON_URL);
@@ -226,7 +241,7 @@ function handlePlex(region, sort) {
 }
 
 function handleSamsungTVPlus(region, sort) {
-  const SAMSUNG_URL = 'https://i.mjh.nz/SamsungTVPlus/.channels.json';
+  const SAMSUNG_URL = 'https://i.mjh.nz/SamsungTVPlus/.channels.json.gz';
   const STREAM_URL_TEMPLATE = 'https://jmp2.uk/sam-{id}.m3u8';
 
   // Set a default for `sort` if not provided
@@ -237,12 +252,21 @@ function handleSamsungTVPlus(region, sort) {
   try {
     Logger.log('Fetching new SamsungTVPlus data from URL: ' + SAMSUNG_URL);
 
-    // Fetch JSON data directly
+    // Fetch the gzipped file
     const response = UrlFetchApp.fetch(SAMSUNG_URL);
-    const extractedData = response.getContentText();
+    
+    let gzipBlob = response.getBlob();
+
+    // Set content type to application/x-gzip (Gzip Bug Workaround)
+    gzipBlob = gzipBlob.setContentType('application/x-gzip');
+
+    // Decompress the gzipped data
+    const extractedBlob = Utilities.ungzip(gzipBlob);
+    const extractedData = extractedBlob.getDataAsString();
 
     // Parse JSON data
     data = JSON.parse(extractedData);
+
   } catch (error) {
     Logger.log('Error fetching or processing SamsungTVPlus data: ' + error.message);
     return handleError('Error fetching SamsungTVPlus data: ' + error.message);
@@ -299,7 +323,7 @@ function handleSamsungTVPlus(region, sort) {
 }
 
 function handleRoku(sort) {
-  const ROKU_URL = 'https://i.mjh.nz/Roku/.channels.json';
+  const ROKU_URL = 'https://i.mjh.nz/Roku/.channels.json.gz';
   const STREAM_URL_TEMPLATE = 'https://jmp2.uk/rok-{id}.m3u8';
 
   // Set a default for `sort` if not provided
@@ -310,12 +334,21 @@ function handleRoku(sort) {
   try {
     Logger.log('Fetching new Roku data from URL: ' + ROKU_URL);
 
-    // Fetch JSON data directly
+    // Fetch the gzipped file
     const response = UrlFetchApp.fetch(ROKU_URL);
-    const extractedData = response.getContentText();
+
+    let gzipBlob = response.getBlob();
+
+    // Set content type to application/x-gzip (Gzip Bug Workaround)
+    gzipBlob = gzipBlob.setContentType('application/x-gzip');
+
+    // Decompress the gzipped data
+    const extractedBlob = Utilities.ungzip(gzipBlob);
+    const extractedData = extractedBlob.getDataAsString();
 
     // Parse JSON data
     data = JSON.parse(extractedData);
+
   } catch (error) {
     Logger.log('Error fetching or processing Roku data: ' + error.message);
     return handleError('Error fetching Roku data: ' + error.message);
@@ -351,7 +384,7 @@ function handleRoku(sort) {
 }
 
 function handleStirr(sort) {
-  const STIRR_URL = 'https://i.mjh.nz/Stirr/.channels.json';
+  const STIRR_URL = 'https://i.mjh.nz/Stirr/.channels.json.gz';
 
   // Set a default for `sort` if not provided
   sort = sort || 'name';
@@ -361,12 +394,21 @@ function handleStirr(sort) {
   try {
     Logger.log('Fetching new Stirr data from URL: ' + STIRR_URL);
 
-    // Fetch JSON data directly
+    // Fetch the gzipped file
     const response = UrlFetchApp.fetch(STIRR_URL);
-    const extractedData = response.getContentText();
+
+    let gzipBlob = response.getBlob();
+
+    // Set content type to application/x-gzip (Gzip Bug Workaround)
+    gzipBlob = gzipBlob.setContentType('application/x-gzip');
+
+    // Decompress the gzipped data
+    const extractedBlob = Utilities.ungzip(gzipBlob);
+    const extractedData = extractedBlob.getDataAsString();
 
     // Parse JSON data
     data = JSON.parse(extractedData);
+
   } catch (error) {
     Logger.log('Error fetching or processing Stirr data: ' + error.message);
     return handleError('Error fetching Stirr data: ' + error.message);
@@ -432,9 +474,22 @@ function handlePBSKids(service) {
 
   try {
     Logger.log('Fetching new PBS Kids data');
-    const APP_URL = 'https://i.mjh.nz/PBS/.kids_app.json';
+    const APP_URL = 'https://i.mjh.nz/PBS/.kids_app.json.gz';
+
+    // Fetch the gzipped file
     const response = UrlFetchApp.fetch(APP_URL);
-    data = JSON.parse(response.getContentText());
+    
+    let gzipBlob = response.getBlob();
+
+    // Set content type to application/x-gzip (Gzip Bug Workaround)
+    gzipBlob = gzipBlob.setContentType('application/x-gzip');
+
+    // Decompress the gzipped data
+    const extractedBlob = Utilities.ungzip(gzipBlob);
+    const extractedData = extractedBlob.getDataAsString();
+
+    // Parse JSON data
+    data = JSON.parse(extractedData);
 
     let output = `#EXTM3U url-tvg="https://github.com/matthuisman/i.mjh.nz/raw/master/PBS/kids_all.xml.gz"\n`;
 
@@ -462,7 +517,7 @@ function handlePBSKids(service) {
 }
 
 function handlePBS() {
-  const DATA_URL = 'https://i.mjh.nz/PBS/.app.json';
+  const DATA_URL = 'https://i.mjh.nz/PBS/.app.json.gz';
   const EPG_URL = 'https://i.mjh.nz/PBS/all.xml.gz';
 
   let data;
@@ -470,12 +525,21 @@ function handlePBS() {
   try {
     Logger.log('Fetching new PBS data from URL: ' + DATA_URL);
 
-    // Fetch JSON data directly
+    // Fetch the gzipped file
     const response = UrlFetchApp.fetch(DATA_URL);
-    const extractedData = response.getContentText();
+
+    let gzipBlob = response.getBlob();
+
+    // Set content type to application/x-gzip (Gzip Bug Workaround)
+    gzipBlob = gzipBlob.setContentType('application/x-gzip');
+
+    // Decompress the gzipped data
+    const extractedBlob = Utilities.ungzip(gzipBlob);
+    const extractedData = extractedBlob.getDataAsString();
 
     // Parse JSON data
     data = JSON.parse(extractedData);
+
   } catch (error) {
     Logger.log('Error fetching or processing PBS data: ' + error.message);
     return handleError('Error fetching PBS data: ' + error.message);
