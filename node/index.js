@@ -1,6 +1,7 @@
 const http = require('http');
 const https = require('https');
 const url = require('url');
+const zlib = require('zlib');
 
 const hostname = '0.0.0.0';
 const port = 4242;
@@ -127,11 +128,27 @@ const server = http.createServer(async (req, res) => {
 
 // Function to handle the PlutoTV service
 async function handlePlutoTV(region, sort) {
-    const PLUTO_URL = 'https://i.mjh.nz/PlutoTV/.channels.json';
+    const PLUTO_URL = 'https://i.mjh.nz/PlutoTV/.channels.json.gz';
     const STREAM_URL_TEMPLATE = 'https://jmp2.uk/plu-{id}.m3u8';
+    const regionNameMap = {
+        ar: "Argentina",
+        br: "Brazil",
+        ca: "Canada",
+        cl: "Chile",
+        de: "Germany",
+        dk: "Denmark",
+        es: "Spain",
+        fr: "France",
+        gb: "United Kingdom",
+        it: "Italy",
+        mx: "Mexico",
+        no: "Norway",
+        se: "Sweden",
+        us: "United States"
+    };
 
     try {
-        const data = await fetchJson(PLUTO_URL);
+        const data = await fetchGzippedJson(PLUTO_URL);
         let output = `#EXTM3U url-tvg="https://github.com/matthuisman/i.mjh.nz/raw/master/PlutoTV/${region}.xml.gz"\n`;
         let channels = {};
 
@@ -140,10 +157,7 @@ async function handlePlutoTV(region, sort) {
                 const regionData = data.regions[regionKey];
                 const regionFullName = regionNameMap[regionKey] || regionKey.toUpperCase();
                 for (const channelKey in regionData.channels) {
-                    const channel = {
-                        ...regionData.channels[channelKey],
-                        region: regionFullName
-                    };
+                    const channel = { ...regionData.channels[channelKey], region: regionFullName };
                     const uniqueChannelId = `${channelKey}-${regionKey}`;
                     channels[uniqueChannelId] = channel;
                 }
@@ -163,13 +177,7 @@ async function handlePlutoTV(region, sort) {
 
         sortedChannelIds.forEach(channelId => {
             const channel = channels[channelId];
-            const {
-                chno,
-                name,
-                group,
-                logo,
-                region: channelRegion
-            } = channel;
+            const { chno, name, group, logo, region: channelRegion } = channel;
             const groupTitle = region === 'all' ? `${channelRegion}` : group;
 
             output += `#EXTINF:-1 channel-id="${channelId}" tvg-id="${channelId}" tvg-chno="${chno}" tvg-name="${name}" tvg-logo="${logo}" group-title="${groupTitle}", ${name}\n`;
@@ -186,7 +194,7 @@ async function handlePlutoTV(region, sort) {
 
 // Function to handle the Plex service
 async function handlePlex(region, sort) {
-    const PLEX_URL = 'https://i.mjh.nz/Plex/.channels.json';
+    const PLEX_URL = 'https://i.mjh.nz/Plex/.channels.json.gz';
     const CHANNELS_JSON_URL = 'https://raw.githubusercontent.com/dtankdempse/free-iptv-channels/main/plex/channels.json';
     const STREAM_URL_TEMPLATE = 'https://jmp2.uk/plex-{id}.m3u8';
 
@@ -204,7 +212,7 @@ async function handlePlex(region, sort) {
     try {
         // Fetch the Plex data
         console.log('Fetching new Plex data from URL:', PLEX_URL);
-        const data = await fetchJson(PLEX_URL);
+        const data = await fetchGzippedJson(PLEX_URL);
 
         console.log('Fetching new channels.json data from URL:', CHANNELS_JSON_URL);
         const plexChannels = await fetchJson(CHANNELS_JSON_URL);
@@ -280,14 +288,14 @@ async function handlePlex(region, sort) {
 
 // Function to handle the Samsung TV Plus service
 async function handleSamsungTVPlus(region, sort) {
-    const SAMSUNG_URL = 'https://i.mjh.nz/SamsungTVPlus/.channels.json';
+    const SAMSUNG_URL = 'https://i.mjh.nz/SamsungTVPlus/.channels.json.gz';
     const STREAM_URL_TEMPLATE = 'https://jmp2.uk/sam-{id}.m3u8';
 
     sort = sort || 'name';
 
     try {
         console.log('Fetching new SamsungTVPlus data from URL:', SAMSUNG_URL);
-        const data = await fetchJson(SAMSUNG_URL); // Assume fetchJson is a predefined async function
+        const data = await fetchGzippedJson(SAMSUNG_URL); // Assume fetchJson is a predefined async function
 
         let output = `#EXTM3U url-tvg="https://github.com/matthuisman/i.mjh.nz/raw/master/SamsungTVPlus/${region}.xml.gz"\n`;
         let channels = {};
@@ -347,7 +355,7 @@ async function handleSamsungTVPlus(region, sort) {
 
 // Function to handle the Roku service
 async function handleRoku(sort) {
-    const ROKU_URL = 'https://i.mjh.nz/Roku/.channels.json';
+    const ROKU_URL = 'https://i.mjh.nz/Roku/.channels.json.gz';
     const STREAM_URL_TEMPLATE = 'https://jmp2.uk/rok-{id}.m3u8';
 
     // Set a default for `sort` if not provided
@@ -355,7 +363,7 @@ async function handleRoku(sort) {
 
     try {
         console.log('Fetching new Roku data from URL:', ROKU_URL);
-        const data = await fetchJson(ROKU_URL); // Assume fetchJson is a predefined async function
+        const data = await fetchGzippedJson(ROKU_URL); // Assume fetchJson is a predefined async function
 
         let output = `#EXTM3U url-tvg="https://github.com/matthuisman/i.mjh.nz/raw/master/Roku/all.xml.gz"\n`;
         const channels = data.channels || {};
@@ -393,14 +401,14 @@ async function handleRoku(sort) {
 
 // Function to handle the Stirr service
 async function handleStirr(sort) {
-    const STIRR_URL = 'https://i.mjh.nz/Stirr/.channels.json';
+    const STIRR_URL = 'https://i.mjh.nz/Stirr/.channels.json.gz';
 
     // Set a default for `sort` if not provided
     sort = sort || 'name';
 
     try {
         console.log('Fetching new Stirr data from URL:', STIRR_URL);
-        const data = await fetchJson(STIRR_URL); // Assume fetchJson is a predefined async function
+        const data = await fetchGzippedJson(STIRR_URL); // Assume fetchJson is a predefined async function
 
         let output = `#EXTM3U url-tvg="https://i.mjh.nz/Stirr/all.xml.gz"\n`;
         const channels = data.channels || {};
@@ -510,11 +518,11 @@ async function handleTubi() {
 
 // Function to handle the PBS Kids service
 async function handlePBSKids() {
-    const APP_URL = 'https://i.mjh.nz/PBS/.kids_app.json';
+    const APP_URL = 'https://i.mjh.nz/PBS/.kids_app.json.gz';
     const EPG_URL = 'https://github.com/matthuisman/i.mjh.nz/raw/master/PBS/kids_all.xml.gz';
 
     try {
-        const data = await fetchJson(APP_URL);
+        const data = await fetchGzippedJson(APP_URL);
         let output = `#EXTM3U url-tvg="${EPG_URL}"\n`;
 
         const sortedKeys = Object.keys(data.channels).sort((a, b) => {
@@ -534,12 +542,12 @@ async function handlePBSKids() {
 
 // Function to handle the PBS service
 async function handlePBS() {
-    const DATA_URL = 'https://i.mjh.nz/PBS/.app.json';
+    const DATA_URL = 'https://i.mjh.nz/PBS/.app.json.gz';
     const EPG_URL = 'https://i.mjh.nz/PBS/all.xml.gz';
 
     try {
         console.log('Fetching new PBS data from URL:', DATA_URL);
-        const data = await fetchJson(DATA_URL); // Assume fetchJson is a predefined async function
+        const data = await fetchGzippedJson(DATA_URL); // Assume fetchJson is a predefined async function
 
         // Format data for M3U8
         let output = `#EXTM3U x-tvg-url="${EPG_URL}"\n`;
@@ -702,6 +710,46 @@ function handleHomePage(res) {
       </script>
     </body>
     </html>`);
+}
+
+// function to fetch and decompresses gzipped JSON files
+async function fetchGzippedJson(url, maxRedirects = 5) {
+    return new Promise((resolve, reject) => {
+        const makeRequest = (currentUrl, redirectsRemaining) => {
+            https.get(currentUrl, (response) => {
+                if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                    if (redirectsRemaining <= 0) {
+                        reject(new Error('Too many redirects'));
+                        return;
+                    }
+                    const redirectUrl = new URL(response.headers.location, currentUrl).href;
+                    makeRequest(redirectUrl, redirectsRemaining - 1);
+                    return;
+                }
+
+                if (response.statusCode !== 200) {
+                    reject(new Error(`Request failed. Status code: ${response.statusCode}`));
+                    return;
+                }
+
+                const gunzip = zlib.createGunzip();
+                const chunks = [];
+                response.pipe(gunzip);
+
+                gunzip.on('data', (chunk) => chunks.push(chunk));
+                gunzip.on('end', () => {
+                    try {
+                        resolve(JSON.parse(Buffer.concat(chunks).toString('utf-8')));
+                    } catch (error) {
+                        reject(new Error('Failed to parse JSON: ' + error.message));
+                    }
+                });
+                gunzip.on('error', (error) => reject(error));
+            }).on('error', (error) => reject(error));
+        };
+
+        makeRequest(url, maxRedirects);
+    });
 }
 
 server.listen(port, hostname, () => {
